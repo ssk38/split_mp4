@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+
+
+from datetime import datetime, timedelta
+import subprocess
+
+args = None
+
+def split_mp4(infile, outprefix, baseindex, basetime, steptime, num, titlelist=None):
+    for i in range(num):
+        index = baseindex + i
+        if titlelist and (len(titlelist) > index - 1):
+            outfile = "%s%02d.%s.mp4" % (outprefix, index, titlelist[index-1])
+        else:
+            outfile = "%s%02d.mp4" % (outprefix, index)
+        starttime = basetime + steptime * i
+        starttime_sec = int(starttime.total_seconds())
+        steptime_sec = int(steptime.total_seconds())
+        # ffmpeg -ss 4878 -i movie.mp4 -t 542 movie20.mp4
+        command = [
+            "ffmpeg",
+            "-y", # Overwrite output
+            "-ss",
+            "%d" % starttime_sec,
+            "-i",
+            infile,
+            "-t",
+            "%d" % steptime_sec,
+            outfile
+        ]
+        command_str = " ".join(command)
+        print("Running: %s" % command_str)
+        subprocess.run(command_str, shell=True, check=True)
+        
+def parse_step(step):
+    '''
+    @step  "HH:MM:SS"
+    @return timedelta(hours=HH, minutes=MM, seconds=SS)
+    '''
+    try:
+        hh, mm, ss = step.split(":")
+    except:
+        import sys
+        print("Format error, Not HH:MM:SS\n", file=sys.stderr)
+        raise ValueError
+    return timedelta(hours=int(hh), minutes=int(mm), seconds=int(ss))
+                     
+def parse():
+    import argparse
+    parser = argparse.ArgumentParser(prog="split movies")
+    parser.add_argument('infile', help="Input mp4")
+    parser.add_argument('steptime', type=parse_step, help="Cut with this duration HH:MM:SS")
+    parser.add_argument('num', type=int, help="Num of cuts")
+    parser.add_argument('-bt', '--basetime', default=timedelta(seconds=0), type=parse_step, help="Cut base HH:MM:SS")
+    parser.add_argument('-o', '--outprefix', default="", help="Out prefix name of mp4, default empty.")
+    parser.add_argument('-t', '--titlelist', default=None, help="title name list")
+    parser.add_argument('-bi', '--baseindex', default=1, type=int, help="Output base index, default=1")
+    parser.add_argument('--endtime', default=None, type=parse_step, help="End time, steptime and num are ignored when pecified")
+    global args
+    args = parser.parse_args()
+
+    
+def main():
+    parse()
+    global args
+    print(args)
+    titlelist = None
+    if args.titlelist:
+        with open(args.titlelist, "r") as fp:
+            titlelist = fp.read().split("\n")
+    if args.endtime:
+        split_mp4(args.infile, args.outprefix, args.baseindex, args.basetime, args.endtime - args.basetime, args.num, titlelist=titlelist)
+    else:
+        split_mp4(args.infile, args.outprefix, args.baseindex, args.basetime, args.steptime, args.num, titlelist=titlelist)
+    print("aplit.py Successfully end.!!!")
+
+if __name__ == "__main__":
+    main()
